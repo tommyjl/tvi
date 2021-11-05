@@ -1,3 +1,6 @@
+pub mod buffer;
+pub mod tui;
+
 fn main() {
-    println!("Hello, world!");
+    tui::Tui::new().run();
 }
