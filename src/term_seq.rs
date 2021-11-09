@@ -16,7 +16,7 @@ impl fmt::Display for ClearScreen {
     }
 }
 
-pub struct Goto(usize, usize);
+pub struct Goto(pub usize, pub usize);
 
 impl fmt::Display for Goto {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
