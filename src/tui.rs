@@ -7,14 +7,14 @@ use std::io::prelude::*;
 
 pub struct Tui {
     buf: Buffer,
-    term: Term,
+    _term: Term,
 }
 
 impl Tui {
     pub fn new() -> Self {
         Self {
             buf: Buffer::new(),
-            term: Term::new().expect("Failed to set up terminal"),
+            _term: Term::new().expect("Failed to set up terminal"),
         }
     }
 
@@ -24,44 +24,10 @@ impl Tui {
 
     pub fn run(&mut self) {
         loop {
-            let mut buf = [0u8; 512]; // Arbitrary choice of 512
-            let len = io::stdin().read(&mut buf).unwrap();
-            let input = match len {
-                1 => match buf[0] {
-                    0x03 => Input::Etx,
-                    0x1A => Input::Sub,
-                    0x1B => Input::Esc,
-                    0x7F => Input::Backspace,
-                    0x0D => Input::Enter,
-                    // 0x0A => Input::LF,
-                    c if c < 0x20 => panic!("Unhandled input single character {}", c),
-                    _ => Input::Utf8(buf[0] as char),
-                },
-                3 => match &buf[0..3] {
-                    b"\x1B[A" => Input::Up,
-                    b"\x1B[B" => Input::Down,
-                    b"\x1B[C" => Input::Right,
-                    b"\x1B[D" => Input::Left,
-                    b"\x1B[F" => Input::End,
-                    b"\x1B[H" => Input::Home,
-                    _ => panic!("Unhandled input {:?}", &buf[0..3]),
-                },
-                4 => match &buf[0..4] {
-                    b"\x1B[1~" => Input::Home,
-                    b"\x1B[2~" => Input::Insert,
-                    b"\x1B[3~" => Input::Delete,
-                    b"\x1B[4~" => Input::End,
-                    b"\x1B[5~" => Input::PgUp,
-                    b"\x1B[6~" => Input::PgDown,
-                    b"\x1B[7~" => Input::Home,
-                    b"\x1B[8~" => Input::End,
-                    _ => panic!("Unhandled input {:?}", &buf[0..4]),
-                },
-                _ => panic!("Unhandled input {:?}", &buf[0..len]),
-            };
+            let input = read_input(&mut io::stdin()).unwrap();
 
             if cfg!(feature = "debug_inputs") {
-                print!("{} - {:?}\r\n", len, input);
+                print!("Input = {:?}\r\n", input);
             }
 
             match input {
@@ -96,17 +62,59 @@ enum Input {
 
     Esc,
     Enter,
+    Tab,
+    BackTab,
+
     Up,
     Down,
     Right,
     Left,
+
     Backspace,
-    Home,
     Insert,
     Delete,
+    Home,
     End,
     PgUp,
     PgDown,
 
     Utf8(char),
+}
+
+fn read_input<R>(stdin: &mut R) -> Result<Input, String>
+where
+    R: Read,
+{
+    let mut buf = [0u8; 512]; // Arbitrary choice of 512
+    let len = stdin.read(&mut buf).unwrap();
+    match &buf[0..len] {
+        [0x03] => Ok(Input::Etx),
+        [0x09] => Ok(Input::Tab),
+        [0x1A] => Ok(Input::Sub),
+        [0x1B] => Ok(Input::Esc),
+        [0x7F] => Ok(Input::Backspace),
+        [0x0A] => Ok(Input::Enter),
+        [0x0D] => Ok(Input::Enter),
+        b"\x1B[A" => Ok(Input::Up),
+        b"\x1B[B" => Ok(Input::Down),
+        b"\x1B[C" => Ok(Input::Right),
+        b"\x1B[D" => Ok(Input::Left),
+        b"\x1B[F" => Ok(Input::End),
+        b"\x1B[H" => Ok(Input::Home),
+        b"\x1B[Z" => Ok(Input::BackTab),
+        b"\x1B[1~" => Ok(Input::Home),
+        b"\x1B[2~" => Ok(Input::Insert),
+        b"\x1B[3~" => Ok(Input::Delete),
+        b"\x1B[4~" => Ok(Input::End),
+        b"\x1B[5~" => Ok(Input::PgUp),
+        b"\x1B[6~" => Ok(Input::PgDown),
+        b"\x1B[7~" => Ok(Input::Home),
+        b"\x1B[8~" => Ok(Input::End),
+        buf if len == 1 && buf[0] >= 0x20 && buf[0] < 0x7F => Ok(Input::Utf8(buf[0] as char)),
+        _ => Err(format!(
+            "Unhandled input. Length = {}, Buf = {:?}",
+            len,
+            &buf[0..len]
+        )),
+    }
 }

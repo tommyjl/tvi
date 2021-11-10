@@ -13,7 +13,6 @@ impl Term {
 
         let mut raw = original;
         make_raw(&mut raw);
-        // raw.c_lflag &= !libc::ICANON;
         set_attr(&raw)?;
 
         Ok(Self {
@@ -55,14 +54,5 @@ fn set_attr(termios: &Termios) -> io::Result<()> {
 fn make_raw(termios: &mut Termios) {
     unsafe {
         libc::cfmakeraw(termios);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn foo() {
-        let s = format!("{:b}", !8);
-        assert_eq!("1000", s);
     }
 }
