@@ -4,8 +4,8 @@ use std::str;
 const CAPACITY: usize = 512;
 
 pub struct Buffer {
-    inner: Vec<u8>,
-    cursor: usize,
+    pub inner: Vec<u8>,
+    pub cursor: usize,
 }
 
 impl Buffer {

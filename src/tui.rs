@@ -12,6 +12,8 @@ pub struct Tui {
 
 impl Tui {
     pub fn new() -> Self {
+        print!("\x1B[?1049h{}", Goto(1, 1));
+        io::stdout().flush().unwrap();
         Self {
             buf: Buffer::new(),
             _term: Term::new().expect("Failed to set up terminal"),
@@ -23,28 +25,31 @@ impl Tui {
     }
 
     pub fn run(&mut self) {
-        loop {
-            let input = read_input(&mut io::stdin()).unwrap();
-
-            if cfg!(feature = "debug_inputs") {
-                print!("Input = {:?}\r\n", input);
+        if cfg!(feature = "debug_inputs") {
+            loop {
+                match read_input(&mut io::stdin()) {
+                    Ok(Input::Etx) => return,
+                    Ok(input) => print!("Input = {:?}\r\n", input),
+                    Err(err) => print!("{}\r\n", err),
+                }
             }
-
-            match input {
-                Input::Etx => return,
-                Input::Utf8(c) => self.handle_input(c as u8),
-                _ => {}
-            };
-
-            if !cfg!(feature = "debug_inputs") {
-                self.draw();
+        } else {
+            loop {
+                if let Ok(input) = read_input(&mut io::stdin()) {
+                    match input {
+                        Input::Etx => return,
+                        Input::Utf8(c) => self.handle_input(c as u8),
+                        _ => {}
+                    };
+                    self.draw();
+                }
             }
         }
     }
 
     fn draw(&self) {
         let mut out = io::stdout();
-        print!("{}{}{}\r", Goto(1, 1), ClearScreen, self.buf.to_string());
+        print!("{}{}{}", Goto(1, 1), ClearScreen, self.buf.to_string());
         out.flush().unwrap();
     }
 }
@@ -55,7 +60,13 @@ impl Default for Tui {
     }
 }
 
-#[derive(Debug)]
+impl Drop for Tui {
+    fn drop(&mut self) {
+        println!("\x1B[?1049l");
+    }
+}
+
+#[derive(Debug, PartialEq)]
 enum Input {
     Etx, // End of text (Ctrl-C interrupt)
     Sub, // Substitute (Ctrl-Z suspend)
