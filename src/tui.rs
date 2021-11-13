@@ -7,16 +7,14 @@ use std::io::prelude::*;
 
 pub struct Tui {
     buf: Buffer,
-    _term: Term,
+    term: Term<io::Stdout>,
 }
 
 impl Tui {
     pub fn new() -> Self {
-        print!("\x1B[?1049h{}", Goto(1, 1));
-        io::stdout().flush().unwrap();
         Self {
             buf: Buffer::new(),
-            _term: Term::new().expect("Failed to set up terminal"),
+            term: Term::new(io::stdout()).expect("Failed to set up terminal"),
         }
     }
 
@@ -29,8 +27,8 @@ impl Tui {
             loop {
                 match read_input(&mut io::stdin()) {
                     Ok(Input::Etx) => return,
-                    Ok(input) => print!("Input = {:?}\r\n", input),
-                    Err(err) => print!("{}\r\n", err),
+                    Ok(input) => write!(self.term, "Input = {:?}\r\n", input).unwrap(),
+                    Err(err) => write!(self.term, "{}\r\n", err).unwrap(),
                 }
             }
         } else {
@@ -41,28 +39,29 @@ impl Tui {
                         Input::Utf8(c) => self.handle_input(c as u8),
                         _ => {}
                     };
-                    self.draw();
+                    self.draw().expect("Failed to draw to the screen");
                 }
             }
         }
     }
 
-    fn draw(&self) {
+    fn draw(&mut self) -> io::Result<()> {
         let mut out = io::stdout();
-        print!("{}{}{}", Goto(1, 1), ClearScreen, self.buf.to_string());
-        out.flush().unwrap();
+        write!(
+            self.term,
+            "{}{}{}",
+            Goto(1, 1),
+            ClearScreen,
+            self.buf.to_string()
+        )?;
+        out.flush()?;
+        Ok(())
     }
 }
 
 impl Default for Tui {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl Drop for Tui {
-    fn drop(&mut self) {
-        println!("\x1B[?1049l");
     }
 }
 
