@@ -1,11 +1,13 @@
 use std::io::prelude::*;
+use std::io::SeekFrom;
 use std::str;
 
-const CAPACITY: usize = 512;
+const CAPACITY: usize = 16;
 
 pub struct Buffer {
     pub inner: Vec<u8>,
     pub cursor: usize,
+    gap_end: usize,
 }
 
 impl Buffer {
@@ -13,6 +15,7 @@ impl Buffer {
         Self {
             inner: vec![0u8; CAPACITY],
             cursor: 0,
+            gap_end: CAPACITY,
         }
     }
 
@@ -22,22 +25,57 @@ impl Buffer {
 
         if self.cursor == self.inner.len() {
             self.inner.append(&mut vec![0u8; CAPACITY]);
+            self.inner[self.gap_end..].rotate_right(CAPACITY);
+            self.gap_end += CAPACITY;
         }
+    }
+
+    fn draw_buffer(&self) -> String {
+        let mut ret = String::new();
+
+        let left = str::from_utf8(&self.inner[0..self.cursor]).unwrap();
+        ret.push_str(left);
+        ret.push('\n');
+
+        let right = str::from_utf8(&self.inner[self.gap_end..]).unwrap();
+        ret.push_str(right);
+        ret.push('\n');
+
+        ret
+    }
+
+    fn draw_buffer_info(&self) -> String {
+        format!("{} | {} | {}", self.cursor, self.gap_end, self.inner.len())
     }
 }
 
 impl ToString for Buffer {
     fn to_string(&self) -> String {
         let mut ret = String::new();
-        let s = str::from_utf8(&self.inner[0..self.cursor]).unwrap();
-        ret.push_str(s);
+        ret.push_str(&self.draw_buffer());
+        ret.push('\r');
+        ret.push_str(&self.draw_buffer_info());
+        ret.push('\r');
         ret
     }
 }
 
 impl Seek for Buffer {
-    fn seek(&mut self, _pos: std::io::SeekFrom) -> std::io::Result<u64> {
-        todo!()
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        if let SeekFrom::Current(offset) = pos {
+            if offset < 0 && self.cursor > 0 {
+                self.cursor -= offset.abs() as usize;
+                self.inner[self.cursor..self.gap_end].rotate_left(offset.abs() as usize);
+                self.gap_end -= 1;
+            } else if offset > 0 && self.gap_end < self.inner.len() {
+                self.gap_end += 1;
+                self.inner[self.cursor..self.gap_end].rotate_right(offset.abs() as usize);
+                self.cursor += offset as usize;
+            }
+        } else {
+            todo!()
+        }
+        Ok(self.cursor as u64)
     }
 }
 

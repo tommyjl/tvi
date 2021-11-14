@@ -36,6 +36,13 @@ impl Tui {
                 if let Ok(input) = read_input(&mut io::stdin()) {
                     match input {
                         Input::Etx => return,
+                        Input::Left => {
+                            self.buf.seek(io::SeekFrom::Current(-1)).unwrap();
+                        }
+                        Input::Right => {
+                            self.buf.seek(io::SeekFrom::Current(1)).unwrap();
+                        }
+                        Input::Enter => self.handle_input(b'\n'),
                         Input::Utf8(c) => self.handle_input(c as u8),
                         _ => {}
                     };
